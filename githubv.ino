@@ -11,10 +11,11 @@ const int DBUG = 1;          // Set this to 0 for no serial output for debugging
 //----------------------------
 
 //----------[ GLOBAL VARS ]---------------
-const char* ssid = "X";
-const char* password =  "X";
+const char* ssid = "x";
+const char* password =  "x";
 bool GV_WEB_REQUEST_IN_PROGRESS = false;
 bool GV_READ_REQUEST_IN_PROGRESS = false;
+bool GV_THIS_IS_A_SERIAL_COMMAND = false;
 //----------------------------------------
 
 //BUTTON
@@ -133,6 +134,7 @@ void loop() {
     if (computerdata[0] == 'c' || computerdata[0] == 'r')time_ = 600;     //if a command has been sent to calibrate or take a reading we wait 600ms so that the circuit has time to take the reading.
     else time_ = 300;                                                     //if not 300ms will do
 
+    GV_THIS_IS_A_SERIAL_COMMAND=true;                                     //set gloabal indicator that the next command to the DO cercuit is from the Serial Monitor.
     String str_serial_command=computerdata;                               //convert char array to String type for the function that follows
     SendCommandAndSetDOxVariables(str_serial_command);                    //send the command received by the serial monitoring device.
   }
@@ -165,7 +167,7 @@ void LCD_DISPLAY(String Text, int row, int col, bool xClearLCD, bool xprintSeria
   if (xClearLCD) lcd.clear();
   lcd.setCursor(row, col); // set the cursor to column 15, line 1
   lcd.print(Text);
-  if (xprintSerial) if(DBUG) Serial.println(Text);
+  if (xprintSerial) if(DBUG) Serial.println("LCD:" + Text);
 }
 // function to set a string to 16 characters long by padding end with spaces
 // this is for the LCD so that it will erase any data left on the upper-left text area
@@ -216,14 +218,13 @@ void LCDshowHeartBeat() {
 void SendCommandAndSetDOxVariables(String command) {
   char Ccommand[20];
   byte code = 0;                   //used to hold the I2C response code.
+  command[0] = tolower(command[0]);
   command.toCharArray(Ccommand,20);
   Wire.beginTransmission(DOxAddress);                              //call the circuit by its ID number.
   Wire.write(Ccommand);                                            //transmit the command that was sent through the serial port.
   Wire.endTransmission();                                          //end the I2C data transmission.
-  Serial.println("");
-  Serial.print("***");
-  Serial.print(Ccommand);
-  Serial.print("***");
+ 
+  if (DBUG){ Serial.print("DOc command:("); Serial.print(Ccommand); Serial.print(")"); }
 
   if (Ccommand[0] == 'c' || Ccommand[0] == 'r' || Ccommand[0] == 'n')time_ = 600;     //if a command has been sent to calibrate or take a reading we wait 600ms so that the circuit has time to take the reading.
   else time_ = 300;                                             //if not 300ms will do
@@ -272,8 +273,12 @@ void SendCommandAndSetDOxVariables(String command) {
 
   GV_DOX_DATA = DO_data;         
 
-  Serial.println("GV_DOX_DATA:" + GV_DOX_DATA);
-  Serial.println("GV_SENSOR_RESPONSE:" + GV_SENSOR_RESPONSE);
   GV_WEB_RESPONSE_TEXT=GV_DOX_DATA + "," + GV_SENSOR_RESPONSE;
-  Serial.println("GV_WEB_RESPONSE_TEXT" + GV_WEB_RESPONSE_TEXT);
+
+  if ( DBUG==2 || (DBUG==1 && GV_THIS_IS_A_SERIAL_COMMAND) ){
+      Serial.println("GV_DOX_DATA:" + GV_DOX_DATA);
+      Serial.println("GV_SENSOR_RESPONSE:" + GV_SENSOR_RESPONSE);
+      Serial.println("GV_WEB_RESPONSE_TEXT" + GV_WEB_RESPONSE_TEXT);
+  }
+  if (GV_THIS_IS_A_SERIAL_COMMAND) GV_THIS_IS_A_SERIAL_COMMAND=false;                                     //set gloabal indicator that command from the Serial Monitor is done.
 }
