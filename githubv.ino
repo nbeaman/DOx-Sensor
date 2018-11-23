@@ -7,7 +7,7 @@
 #include <cstring>
 
 //-----------[ DBUG ]---------
-const int DBUG = 1;          // Set this to 0 for no serial output for debugging, 1 for moderate debugging, 2 for FULL debugging to see serail output in the Arduino GUI.
+const int DBUG = 0;          // Set this to 0 for no serial output for debugging, 1 for moderate debugging, 2 for FULL debugging to see serail output in the Arduino GUI.
 //----------------------------
 
 //----------[ GLOBAL VARS ]---------------
@@ -163,6 +163,26 @@ void loop() {
 
 
 //===============================[ FUNCTIONS ]=========================
+String AddCarrageReturnIfNeeded(String str){
+    
+    long int len = str.length();
+    int i=0;
+    bool HasCR = false;
+    
+    for (i=0; i < len; i++) if (str[i]=='\r') HasCR=true;
+    
+    if (!HasCR) { str[i++]='\r'; str[i++]='\0'; }
+    
+    if(DBUG==2){
+        for (i=0; i < str[i] != '\0'; i++){
+            Serial.print(str[i]); Serial.print(":"); Serial.print(i); Serial.print(":"); Serial.print(int(str[i]));
+        }
+    }
+
+    return str;
+    
+}
+
 void LCD_DISPLAY(String Text, int row, int col, bool xClearLCD, bool xprintSerial) { // 12 Millis
   if (xClearLCD) lcd.clear();
   lcd.setCursor(row, col); // set the cursor to column 15, line 1
@@ -219,6 +239,7 @@ void SendCommandAndSetDOxVariables(String command) {
   char Ccommand[20];
   byte code = 0;                   //used to hold the I2C response code.
   command[0] = tolower(command[0]);
+  command=AddCarrageReturnIfNeeded(command);
   command.toCharArray(Ccommand,20);
   Wire.beginTransmission(DOxAddress);                              //call the circuit by its ID number.
   Wire.write(Ccommand);                                            //transmit the command that was sent through the serial port.
