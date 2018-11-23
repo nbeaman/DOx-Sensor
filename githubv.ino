@@ -82,6 +82,7 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     LCD_DISPLAY("Wifi..", 0, 0, ClearLCD, PrintSerial);
+    LCD_DISPLAY(ssid, 0, 1, NoClearLCD, PrintSerial);
   }
   IPAddress IP=WiFi.localIP();
   GV_LCD_MAIN_TEXT[0]=PadWithSpaces(String(IP[0]) + '.' + String(IP[1]) + '.' + String(IP[2]) + '.' + String(IP[3]));
