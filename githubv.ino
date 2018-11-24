@@ -16,6 +16,7 @@ const char* password =  "x";
 bool GV_WEB_REQUEST_IN_PROGRESS = false;
 bool GV_READ_REQUEST_IN_PROGRESS = false;
 bool GV_THIS_IS_A_SERIAL_COMMAND = false;
+bool GV_QUERY_DO_NAME_ON_NEXT_COMMAND = true;   // Loop tests first to see if we need to query the DO for it's name.  Set to true to do this first thing.
 //----------------------------------------
 
 //BUTTON
@@ -84,12 +85,12 @@ void setup() {
     LCD_DISPLAY("Wifi..", 0, 0, ClearLCD, PrintSerial);
     LCD_DISPLAY(ssid, 0, 1, NoClearLCD, PrintSerial);
   }
+  lcd.clear();
+  
   IPAddress IP=WiFi.localIP();
   GV_LCD_MAIN_TEXT[0]=PadWithSpaces(String(IP[0]) + '.' + String(IP[1]) + '.' + String(IP[2]) + '.' + String(IP[3]));
 
   SendCommandAndSetDOxVariables("name,?");          // get the name of the DO sensor to display on the LCD
-  GV_DOX_DATA.remove(0,6);
-  GV_LCD_MAIN_TEXT[1]=PadWithSpaces(GV_DOX_DATA);
   
   //-----------------[ read web page]-------------------------------
   server.on("/read", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -128,6 +129,17 @@ void setup() {
 //===============================[ LOOP ]==============================
 void loop() {
 
+  if (GV_QUERY_DO_NAME_ON_NEXT_COMMAND){              // query DO name if this is set to true, then display it on the LCD screen. 
+    SendCommandAndSetDOxVariables("name,?\0");
+    Serial.println("DOOD");
+    Serial.println(GV_DOX_DATA);
+    GV_DOX_DATA.remove(0,6);
+    GV_LCD_MAIN_TEXT[1]=PadWithSpaces(GV_DOX_DATA);
+    GV_LCD_MAIN_TEXT_INDEX=1;
+    LCD_DISPLAY(GV_LCD_MAIN_TEXT[GV_LCD_MAIN_TEXT_INDEX],0,0,NoClearLCD,PrintSerial);
+    GV_QUERY_DO_NAME_ON_NEXT_COMMAND = false;
+  }
+  
   if (Serial.available() > 0) {                                           //if data is holding in the serial buffer
     received_from_computer = Serial.readBytesUntil(13, computerdata, 20); //we read the data sent from the serial monitor(pc/mac/other) until we see a <CR>. We also count how many characters have been received.
     computerdata[received_from_computer] = 0;                             //stop the buffer from transmitting leftovers or garbage.
@@ -297,6 +309,10 @@ void SendCommandAndSetDOxVariables(String command) {
 
   GV_WEB_RESPONSE_TEXT=GV_DOX_DATA + "," + GV_SENSOR_RESPONSE;
 
+  if (Ccommand[0] == 'n' && Ccommand[5] != '?'){              // someone sent the name,TheName to the DO cercuit (not just querying the name,?).
+    GV_QUERY_DO_NAME_ON_NEXT_COMMAND = true;    
+  }
+  
   if ( DBUG==2 || (DBUG==1 && GV_THIS_IS_A_SERIAL_COMMAND) ){
       Serial.println("GV_DOX_DATA:" + GV_DOX_DATA);
       Serial.println("GV_SENSOR_RESPONSE:" + GV_SENSOR_RESPONSE);
