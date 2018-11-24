@@ -16,7 +16,8 @@ const char* password =  "x";
 bool GV_WEB_REQUEST_IN_PROGRESS = false;
 bool GV_READ_REQUEST_IN_PROGRESS = false;
 bool GV_THIS_IS_A_SERIAL_COMMAND = false;
-bool GV_QUERY_DO_NAME_ON_NEXT_COMMAND = true;   // Loop tests first to see if we need to query the DO for it's name.  Set to true to do this first thing.
+bool GV_QUERY_DO_NAME_ON_NEXT_COMMAND = true;   // Loop tests first to see if we need to query the DO for it's name.  Set to true to do this first thing
+bool GV_BOOTING_UP = true;
 //----------------------------------------
 
 //BUTTON
@@ -170,6 +171,8 @@ void loop() {
   LCDshowHeartBeat();
 
   BUTTON_WasItPressed_ChangeLCD();
+
+  GV_BOOTING_UP=false;
   
 }
 
@@ -213,7 +216,7 @@ String PadWithSpaces(String str){
 
 void BUTTON_WasItPressed_ChangeLCD(){
   String LCDTEXT;
-  if (button1.pressed()){
+  if (button1.pressed() && !GV_BOOTING_UP){
     if(DBUG) Serial.println("Button 1 pressed");
     switch (GV_LCD_MAIN_TEXT_INDEX){
       case 0: GV_LCD_MAIN_TEXT_INDEX=1;
