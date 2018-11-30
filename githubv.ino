@@ -190,7 +190,7 @@ String AddCarrageReturnIfNeeded(String str){
     if (!HasCR) { str[i++]='\r'; str[i++]='\0'; }
     
     if(DBUG==2){
-        for (i=0; i < str[i] != '\0'; i++){
+        for (i=0; i < (str[i] != '\0'); i++){
             Serial.print(str[i]); Serial.print(":"); Serial.print(i); Serial.print(":"); Serial.print(int(str[i]));
         }
     }
