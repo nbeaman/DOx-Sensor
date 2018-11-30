@@ -7,7 +7,7 @@
 #include <cstring>
 
 //-----------[ DBUG ]---------
-const int DBUG = 1;          // Set this to 0 for no serial output for debugging, 1 for moderate debugging, 2 for FULL debugging to see serail output in the Arduino GUI.
+const int DBUG = 0;          // Set this to 0 for no serial output for debugging, 1 for moderate debugging, 2 for FULL debugging to see serail output in the Arduino GUI.
 //----------------------------
 
 //----------[ GLOBAL VARS ]---------------
@@ -16,6 +16,8 @@ const char* password =  "x";
 bool GV_WEB_REQUEST_IN_PROGRESS = false;
 bool GV_READ_REQUEST_IN_PROGRESS = false;
 bool GV_THIS_IS_A_SERIAL_COMMAND = false;
+bool GV_QUERY_DO_NAME_ON_NEXT_COMMAND = true;   // Loop tests first to see if we need to query the DO for it's name.  Set to true to do this first thing
+bool GV_BOOTING_UP = true;
 //----------------------------------------
 
 //BUTTON
@@ -82,13 +84,14 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     LCD_DISPLAY("Wifi..", 0, 0, ClearLCD, PrintSerial);
+    LCD_DISPLAY(ssid, 0, 1, NoClearLCD, PrintSerial);
   }
+  lcd.clear();
+  
   IPAddress IP=WiFi.localIP();
   GV_LCD_MAIN_TEXT[0]=PadWithSpaces(String(IP[0]) + '.' + String(IP[1]) + '.' + String(IP[2]) + '.' + String(IP[3]));
 
   SendCommandAndSetDOxVariables("name,?");          // get the name of the DO sensor to display on the LCD
-  GV_DOX_DATA.remove(0,6);
-  GV_LCD_MAIN_TEXT[1]=PadWithSpaces(GV_DOX_DATA);
   
   //-----------------[ read web page]-------------------------------
   server.on("/read", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -127,6 +130,17 @@ void setup() {
 //===============================[ LOOP ]==============================
 void loop() {
 
+  if (GV_QUERY_DO_NAME_ON_NEXT_COMMAND){              // query DO name if this is set to true, then display it on the LCD screen. 
+    SendCommandAndSetDOxVariables("name,?\0");
+    Serial.println("DOOD");
+    Serial.println(GV_DOX_DATA);
+    GV_DOX_DATA.remove(0,6);
+    GV_LCD_MAIN_TEXT[1]=PadWithSpaces(GV_DOX_DATA);
+    GV_LCD_MAIN_TEXT_INDEX=1;
+    LCD_DISPLAY(GV_LCD_MAIN_TEXT[GV_LCD_MAIN_TEXT_INDEX],0,0,NoClearLCD,PrintSerial);
+    GV_QUERY_DO_NAME_ON_NEXT_COMMAND = false;
+  }
+  
   if (Serial.available() > 0) {                                           //if data is holding in the serial buffer
     received_from_computer = Serial.readBytesUntil(13, computerdata, 20); //we read the data sent from the serial monitor(pc/mac/other) until we see a <CR>. We also count how many characters have been received.
     computerdata[received_from_computer] = 0;                             //stop the buffer from transmitting leftovers or garbage.
@@ -157,12 +171,34 @@ void loop() {
   LCDshowHeartBeat();
 
   BUTTON_WasItPressed_ChangeLCD();
+
+  GV_BOOTING_UP=false;
   
 }
 
 
 
 //===============================[ FUNCTIONS ]=========================
+String AddCarrageReturnIfNeeded(String str){
+    
+    long int len = str.length();
+    int i=0;
+    bool HasCR = false;
+    
+    for (i=0; i < len; i++) if (str[i]=='\r') HasCR=true;
+    
+    if (!HasCR) { str[i++]='\r'; str[i++]='\0'; }
+    
+    if(DBUG==2){
+        for (i=0; i < (str[i] != '\0'); i++){
+            Serial.print(str[i]); Serial.print(":"); Serial.print(i); Serial.print(":"); Serial.print(int(str[i]));
+        }
+    }
+
+    return str;
+    
+}
+
 void LCD_DISPLAY(String Text, int row, int col, bool xClearLCD, bool xprintSerial) { // 12 Millis
   if (xClearLCD) lcd.clear();
   lcd.setCursor(row, col); // set the cursor to column 15, line 1
@@ -180,7 +216,7 @@ String PadWithSpaces(String str){
 
 void BUTTON_WasItPressed_ChangeLCD(){
   String LCDTEXT;
-  if (button1.pressed()){
+  if (button1.pressed() && !GV_BOOTING_UP){
     if(DBUG) Serial.println("Button 1 pressed");
     switch (GV_LCD_MAIN_TEXT_INDEX){
       case 0: GV_LCD_MAIN_TEXT_INDEX=1;
@@ -219,6 +255,7 @@ void SendCommandAndSetDOxVariables(String command) {
   char Ccommand[20];
   byte code = 0;                   //used to hold the I2C response code.
   command[0] = tolower(command[0]);
+  command=AddCarrageReturnIfNeeded(command);
   command.toCharArray(Ccommand,20);
   Wire.beginTransmission(DOxAddress);                              //call the circuit by its ID number.
   Wire.write(Ccommand);                                            //transmit the command that was sent through the serial port.
@@ -275,6 +312,10 @@ void SendCommandAndSetDOxVariables(String command) {
 
   GV_WEB_RESPONSE_TEXT=GV_DOX_DATA + "," + GV_SENSOR_RESPONSE;
 
+  if (Ccommand[0] == 'n' && Ccommand[5] != '?'){              // someone sent the name,TheName to the DO cercuit (not just querying the name,?).
+    GV_QUERY_DO_NAME_ON_NEXT_COMMAND = true;    
+  }
+  
   if ( DBUG==2 || (DBUG==1 && GV_THIS_IS_A_SERIAL_COMMAND) ){
       Serial.println("GV_DOX_DATA:" + GV_DOX_DATA);
       Serial.println("GV_SENSOR_RESPONSE:" + GV_SENSOR_RESPONSE);
